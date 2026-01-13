@@ -1,15 +1,15 @@
 
 using CarService.BL;
-using CarService.BL.Interfaces;
 using CarService.DL;
-using CarService.DL.Interfaces;
-using CarService.DL.Repositories;
+using CarService.Host.Healthchecks;
+using CarService.Host.Validators;
+using FluentValidation;
+
+//using FluentValidation;
 using Mapster;
 using Microsoft.OpenApi.Models;
 using Serilog;
 using Serilog.Sinks.SystemConsole.Themes;
-
-
 
 namespace CarService.Host
 {
@@ -18,20 +18,23 @@ namespace CarService.Host
         public static void Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
-            Log.Logger = new LoggerConfiguration()
-    .ReadFrom.Configuration(builder.Configuration)
-    .Enrich.FromLogContext()
-    .WriteTo.Console(theme: AnsiConsoleTheme.Code)
-    .CreateLogger();
 
+            Log.Logger = new LoggerConfiguration()
+            .ReadFrom.Configuration(builder.Configuration)
+            .Enrich.FromLogContext()
+            .WriteTo.Console(theme: AnsiConsoleTheme.Code)
+            .CreateLogger();
 
             // Add services to the container.
             builder.Services
-                .AddDataLayer()
+                .AddDataLayer(builder.Configuration)
                 .AddBusinessLayer();
 
             builder.Services.AddMapster();
-           
+
+            builder.Services
+                .AddValidatorsFromAssemblyContaining<AddCarRequestValidator>();
+
             builder.Services.AddControllers();
             // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
             builder.Services.AddOpenApi();
@@ -43,7 +46,14 @@ namespace CarService.Host
 
             builder.Host.UseSerilog();
 
+            builder.Services
+                .AddHealthChecks()
+                .AddCheck<MyCustomHealtcheck>("sample");
+
             var app = builder.Build();
+
+            app.MapHealthChecks("/healthz");
+
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
             {
